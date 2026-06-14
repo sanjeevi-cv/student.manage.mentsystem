@@ -1,0 +1,341 @@
+#include <iostream>
+#include <fstream>
+#include <sstream>
+#include <vector>
+#include <string>
+#include <iomanip>
+#include <algorithm>
+#include <limits>
+
+using namespace std;
+
+
+struct Student {
+    int    id;
+    string name;
+    int    age;
+    string branch;
+    double cgpa;
+};
+
+const string DATA_FILE = "students.dat";
+const string DELIM     = "|";
+
+void clearScreen() {
+#ifdef _WIN32
+    system("cls");
+#else
+    system("clear");
+#endif
+}
+
+void pauseScreen() {
+    cout << "\n  Press Enter to continue...";
+    cin.ignore(numeric_limits<streamsize>::max(), '\n');
+    cin.get();
+}
+
+void printLine(char ch = '-', int width = 60) {
+    cout << string(width, ch) << "\n";
+}
+
+void printHeader(const string& title) {
+    printLine('=');
+    cout << "  " << title << "\n";
+    printLine('=');
+}
+
+vector<Student> loadAll() {
+    vector<Student> list;
+    ifstream fin(DATA_FILE);
+    if (!fin.is_open()) return list;  
+    string line;
+    while (getline(fin, line)) {
+        if (line.empty()) continue;
+        istringstream ss(line);
+        string tok;
+        Student s;
+        try {
+            getline(ss, tok, '|'); s.id     = stoi(tok);
+            getline(ss, tok, '|'); s.name   = tok;
+            getline(ss, tok, '|'); s.age    = stoi(tok);
+            getline(ss, tok, '|'); s.branch = tok;
+            getline(ss, tok, '|'); s.cgpa   = stod(tok);
+            list.push_back(s);
+        } catch (...) {
+            // skip malformed lines
+        }
+    }
+    fin.close();
+    return list;
+}
+
+void saveAll(const vector<Student>& list) {
+    ofstream fout(DATA_FILE, ios::trunc);
+    for (const auto& s : list) {
+        fout << s.id     << DELIM
+             << s.name   << DELIM
+             << s.age    << DELIM
+             << s.branch << DELIM
+             << fixed << setprecision(2) << s.cgpa << "\n";
+    }
+    fout.close();
+}
+
+
+int nextId(const vector<Student>& list) {
+    int maxId = 0;
+    for (const auto& s : list) maxId = max(maxId, s.id);
+    return maxId + 1;
+}
+
+
+string inputString(const string& prompt) {
+    string val;
+    cout << "  " << prompt;
+    getline(cin, val);
+    return val;
+}
+
+int inputInt(const string& prompt) {
+    int val;
+    while (true) {
+        cout << "  " << prompt;
+        if (cin >> val) { cin.ignore(); return val; }
+        cin.clear();
+        cin.ignore(numeric_limits<streamsize>::max(), '\n');
+        cout << "  [!] Invalid input. Try again.\n";
+    }
+}
+
+double inputDouble(const string& prompt) {
+    double val;
+    while (true) {
+        cout << "  " << prompt;
+        if (cin >> val && val >= 0.0 && val <= 10.0) { cin.ignore(); return val; }
+        cin.clear();
+        cin.ignore(numeric_limits<streamsize>::max(), '\n');
+        cout << "  [!] Enter a valid CGPA (0.0 – 10.0).\n";
+    }
+}
+
+void printTableHeader() {
+    cout << "  " << left
+         << setw(6)  << "ID"
+         << setw(22) << "Name"
+         << setw(6)  << "Age"
+         << setw(14) << "Branch"
+         << setw(8)  << "CGPA" << "\n";
+    printLine('-');
+}
+
+void printRow(const Student& s) {
+    cout << "  " << left
+         << setw(6)  << s.id
+         << setw(22) << s.name
+         << setw(6)  << s.age
+         << setw(14) << s.branch
+         << setw(8)  << fixed << setprecision(2) << s.cgpa << "\n";
+}
+
+
+void addStudent() {
+    clearScreen();
+    printHeader("ADD NEW STUDENT");
+
+    vector<Student> list = loadAll();
+    Student s;
+    s.id     = nextId(list);
+    s.name   = inputString("Full Name   : ");
+    s.age    = inputInt   ("Age         : ");
+    s.branch = inputString("Branch      : ");
+    s.cgpa   = inputDouble("CGPA (0-10) : ");
+
+    list.push_back(s);
+    saveAll(list);
+
+    cout << "\n  [✓] Student added successfully! Assigned ID: " << s.id << "\n";
+    pauseScreen();
+}
+
+void displayAll() {
+    clearScreen();
+    printHeader("ALL STUDENT RECORDS");
+
+    vector<Student> list = loadAll();
+    if (list.empty()) {
+        cout << "  No records found.\n";
+        pauseScreen();
+        return;
+    }
+
+    printTableHeader();
+    for (const auto& s : list) printRow(s);
+    printLine('-');
+    cout << "  Total records: " << list.size() << "\n";
+    pauseScreen();
+}
+
+void searchStudent() {
+    clearScreen();
+    printHeader("SEARCH STUDENT");
+
+    int id = inputInt("Enter Student ID to search: ");
+    vector<Student> list = loadAll();
+
+    for (const auto& s : list) {
+        if (s.id == id) {
+            printLine('-');
+            cout << "  ID     : " << s.id     << "\n"
+                 << "  Name   : " << s.name   << "\n"
+                 << "  Age    : " << s.age    << "\n"
+                 << "  Branch : " << s.branch << "\n"
+                 << "  CGPA   : " << fixed << setprecision(2) << s.cgpa << "\n";
+            printLine('-');
+            pauseScreen();
+            return;
+        }
+    }
+    cout << "  [!] No student found with ID " << id << ".\n";
+    pauseScreen();
+}
+
+void updateStudent() {
+    clearScreen();
+    printHeader("UPDATE STUDENT RECORD");
+
+    int id = inputInt("Enter Student ID to update: ");
+    vector<Student> list = loadAll();
+
+    for (auto& s : list) {
+        if (s.id == id) {
+            cout << "\n  Current record:\n";
+            printTableHeader();
+            printRow(s);
+            cout << "\n  Enter new details (leave blank to keep current):\n\n";
+
+            string tmp;
+
+            tmp = inputString("Name   [" + s.name + "]: ");
+            if (!tmp.empty()) s.name = tmp;
+
+            tmp = inputString("Age    [" + to_string(s.age) + "]: ");
+            if (!tmp.empty()) { try { s.age = stoi(tmp); } catch (...) {} }
+
+            tmp = inputString("Branch [" + s.branch + "]: ");
+            if (!tmp.empty()) s.branch = tmp;
+
+            tmp = inputString("CGPA   [" + to_string(s.cgpa) + "]: ");
+            if (!tmp.empty()) {
+                try {
+                    double g = stod(tmp);
+                    if (g >= 0.0 && g <= 10.0) s.cgpa = g;
+                } catch (...) {}
+            }
+
+            saveAll(list);
+            cout << "\n  [✓] Record updated successfully.\n";
+            pauseScreen();
+            return;
+        }
+    }
+    cout << "  [!] No student found with ID " << id << ".\n";
+    pauseScreen();
+}
+
+void deleteStudent() {
+    clearScreen();
+    printHeader("DELETE STUDENT RECORD");
+
+    int id = inputInt("Enter Student ID to delete: ");
+    vector<Student> list = loadAll();
+
+    auto it = find_if(list.begin(), list.end(),
+                      [id](const Student& s){ return s.id == id; });
+
+    if (it == list.end()) {
+        cout << "  [!] No student found with ID " << id << ".\n";
+        pauseScreen();
+        return;
+    }
+
+    cout << "\n  Record to delete:\n";
+    printTableHeader();
+    printRow(*it);
+    string confirm = inputString("\n  Confirm deletion? (yes/no): ");
+
+    if (confirm == "yes" || confirm == "YES" || confirm == "y") {
+        list.erase(it);
+        saveAll(list);
+        cout << "  [✓] Record deleted successfully.\n";
+    } else {
+        cout << "  Deletion cancelled.\n";
+    }
+    pauseScreen();
+}
+
+void sortAndDisplay() {
+    clearScreen();
+    printHeader("SORT STUDENTS");
+    cout << "  Sort by:\n"
+         << "  [1] Name (A-Z)\n"
+         << "  [2] CGPA (High to Low)\n"
+         << "  [3] ID  (Ascending)\n";
+    int choice = inputInt("Choice: ");
+
+    vector<Student> list = loadAll();
+    if (list.empty()) { cout << "  No records.\n"; pauseScreen(); return; }
+
+    if      (choice == 1) sort(list.begin(), list.end(),
+                               [](const Student& a, const Student& b){ return a.name < b.name; });
+    else if (choice == 2) sort(list.begin(), list.end(),
+                               [](const Student& a, const Student& b){ return a.cgpa > b.cgpa; });
+    else                  sort(list.begin(), list.end(),
+                               [](const Student& a, const Student& b){ return a.id   < b.id;   });
+
+    printLine('-');
+    printTableHeader();
+    for (const auto& s : list) printRow(s);
+    printLine('-');
+    pauseScreen();
+}
+
+void showMenu() {
+    clearScreen();
+    printLine('=');
+    cout << "       STUDENT MANAGEMENT SYSTEM\n";
+    printLine('=');
+    cout << "  [1]  Add New Student\n"
+         << "  [2]  Display All Students\n"
+         << "  [3]  Search Student by ID\n"
+         << "  [4]  Update Student Record\n"
+         << "  [5]  Delete Student Record\n"
+         << "  [6]  Sort & Display Students\n"
+         << "  [0]  Exit\n";
+    printLine('-');
+}
+
+int main() {
+    int choice;
+    do {
+        showMenu();
+        choice = inputInt("Enter your choice: ");
+        switch (choice) {
+            case 1: addStudent();     break;
+            case 2: displayAll();     break;
+            case 3: searchStudent();  break;
+            case 4: updateStudent();  break;
+            case 5: deleteStudent();  break;
+            case 6: sortAndDisplay(); break;
+            case 0:
+                clearScreen();
+                cout << "  Goodbye!\n\n";
+                break;
+            default:
+                cout << "  [!] Invalid option. Try again.\n";
+                pauseScreen();
+        }
+    } while (choice != 0);
+
+    return 0;
+}
